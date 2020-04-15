@@ -39,7 +39,7 @@ object NetworkTraffic {
     env.setParallelism(1)
 
     val stream = env
-      .readTextFile("D:\\Projects\\BigData\\UserBehaviorAnalysis\\NetworkTrafficAnalysis\\src\\main\\resources\\apache.log")
+      .readTextFile("E:\\flink\\UserBehaviorAnalysis\\NetworkTrafficAnalysis\\src\\main\\resources\\apache.log")
       .map(line =>{
         val linearray = line.split(" ")
         // 定义时间转换模板将时间转成时间戳
