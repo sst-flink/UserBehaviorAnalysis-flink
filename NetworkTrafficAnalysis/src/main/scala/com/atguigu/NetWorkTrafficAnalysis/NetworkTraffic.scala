@@ -37,9 +37,9 @@ object NetworkTraffic {
     val env = StreamExecutionEnvironment.getExecutionEnvironment
     env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
     env.setParallelism(1)
-
+    val  path = getClass.getClassLoader.getResource("apache.log").getPath
     val stream = env
-      .readTextFile("E:\\flink\\UserBehaviorAnalysis\\NetworkTrafficAnalysis\\src\\main\\resources\\apache.log")
+      .readTextFile(path)
       .map(line =>{
         val linearray = line.split(" ")
         // 定义时间转换模板将时间转成时间戳

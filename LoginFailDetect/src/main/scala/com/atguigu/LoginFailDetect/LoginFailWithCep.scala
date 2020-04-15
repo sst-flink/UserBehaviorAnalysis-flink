@@ -35,7 +35,7 @@ object LoginFailWithCep {
     val loginFailPattern = Pattern.begin[LoginEvent]("begin").where(_.eventType == "fail")
       .next("next").where(_.eventType == "fail")
       .times(2)
-      .within(Time.seconds(2))
+      .within(Time.seconds(3))
 
     // 在keyby之后的流中匹配出定义好的pattern stream
     val patternStream = CEP.pattern( loginStream, loginFailPattern )
@@ -48,9 +48,8 @@ object LoginFailWithCep {
         val next = pattern.getOrElse("next", null).iterator.next()
         (next.userId, begin.ip, next.ip, next.eventType)
       }
-    )
-      .print()
-
+    ).print()
+    print("====================")
     env.execute("Login Fail Detect Job")
   }
 

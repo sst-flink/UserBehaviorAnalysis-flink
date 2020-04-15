@@ -20,16 +20,16 @@ import scala.collection.mutable.ListBuffer
 /**
   * Copyright (c) 2018-2028 尚硅谷 All Rights Reserved 
   *
-  * Project: UserBehaviorAnalysis
+  * Project: UserBehaviorKafkaAnalysis
   * Package: 
   * Version: 1.0
   *
   * Created by wushengran on 2019/6/11 11:24
   */
 // 输入数据样例类
-case class UserBehavior( userId: Long, itemId: Long, categoryId: Int, behavior: String, timestamp: Long )
+case class UserBehaviorKafka( userId: Long, itemId: Long, categoryId: Int, behavior: String, timestamp: Long )
 // 输出数据样例类
-case class ItemViewCount( itemId: Long, windowEnd: Long, count: Long )
+case class ItemViewCountKafka( itemId: Long, windowEnd: Long, count: Long )
 
 object HotItemsKafka {
   def main(args: Array[String]): Unit = {
@@ -47,13 +47,13 @@ object HotItemsKafka {
     // 显式地定义Time类型
     env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
     env.setParallelism(1)
-    val path = getClass.getClassLoader.getResource("UserBehavior.csv").getPath.toString
+    val path = getClass.getClassLoader.getResource("UserBehaviorKafka.csv").getPath.toString
     val stream = env
 //      .readTextFile(path)
         .addSource(new FlinkKafkaConsumer[String]("hotitems",new SimpleStringSchema() ,properties))
       .map(line => {
         val linearray = line.split(",")
-        UserBehavior( linearray(0).toLong, linearray(1).toLong, linearray(2).toInt, linearray(3), linearray(4).toLong )
+        UserBehaviorKafka( linearray(0).toLong, linearray(1).toLong, linearray(2).toInt, linearray(3), linearray(4).toLong )
       })
       // 指定时间戳和watermark
       .assignAscendingTimestamps(_.timestamp * 1000)
@@ -71,8 +71,8 @@ object HotItemsKafka {
   }
 
   // 自定义实现聚合函数
-  class CountAgg extends AggregateFunction[UserBehavior, Long, Long]{
-    override def add(value: UserBehavior, accumulator: Long): Long = accumulator + 1
+  class CountAgg extends AggregateFunction[UserBehaviorKafka, Long, Long]{
+    override def add(value: UserBehaviorKafka, accumulator: Long): Long = accumulator + 1
 
     override def createAccumulator(): Long = 0L
 
@@ -81,38 +81,38 @@ object HotItemsKafka {
     override def merge(a: Long, b: Long): Long = a + b
   }
 
-  // 自定义实现Window Function，输出ItemViewCount格式
-  class WindowResultFunction extends WindowFunction[Long, ItemViewCount, Tuple, TimeWindow]{
-    override def apply(key: Tuple, window: TimeWindow, input: Iterable[Long], out: Collector[ItemViewCount]): Unit = {
+  // 自定义实现Window Function，输出ItemViewCountKafka格式
+  class WindowResultFunction extends WindowFunction[Long, ItemViewCountKafka, Tuple, TimeWindow]{
+    override def apply(key: Tuple, window: TimeWindow, input: Iterable[Long], out: Collector[ItemViewCountKafka]): Unit = {
       val itemId: Long = key.asInstanceOf[Tuple1[Long]].f0
       val count = input.iterator.next()
-      out.collect(ItemViewCount(itemId, window.getEnd, count))
+      out.collect(ItemViewCountKafka(itemId, window.getEnd, count))
     }
   }
 
   // 自定义实现process function
-  class TopNHotItems(topSize: Int) extends KeyedProcessFunction[Tuple, ItemViewCount, String]{
+  class TopNHotItems(topSize: Int) extends KeyedProcessFunction[Tuple, ItemViewCountKafka, String]{
 
     // 定义状态ListState
-    private var itemState: ListState[ItemViewCount] = _
+    private var itemState: ListState[ItemViewCountKafka] = _
 
     override def open(parameters: Configuration): Unit = {
       super.open(parameters)
       // 命名状态变量的名字和类型
-      val itemStateDesc = new ListStateDescriptor[ItemViewCount]("itemState", classOf[ItemViewCount])
+      val itemStateDesc = new ListStateDescriptor[ItemViewCountKafka]("itemState", classOf[ItemViewCountKafka])
       itemState = getRuntimeContext.getListState(itemStateDesc)
     }
 
-    override def processElement(i: ItemViewCount, context: KeyedProcessFunction[Tuple, ItemViewCount, String]#Context, collector: Collector[String]): Unit = {
+    override def processElement(i: ItemViewCountKafka, context: KeyedProcessFunction[Tuple, ItemViewCountKafka, String]#Context, collector: Collector[String]): Unit = {
       itemState.add(i)
       // 注册定时器，触发时间定为 windowEnd + 1，触发时说明window已经收集完成所有数据
       context.timerService.registerEventTimeTimer( i.windowEnd + 1 )
     }
 
     // 定时器触发操作，从state里取出所有数据，/，输出
-    override def onTimer(timestamp: Long, ctx: KeyedProcessFunction[Tuple, ItemViewCount, String]#OnTimerContext, out: Collector[String]): Unit = {
+    override def onTimer(timestamp: Long, ctx: KeyedProcessFunction[Tuple, ItemViewCountKafka, String]#OnTimerContext, out: Collector[String]): Unit = {
       // 获取所有的商品点击信息
-      val allItems: ListBuffer[ItemViewCount] = ListBuffer()
+      val allItems: ListBuffer[ItemViewCountKafka] = ListBuffer()
       import  scala.collection.JavaConversions._
       for(item <- itemState.get){
         allItems += item
@@ -129,7 +129,7 @@ object HotItemsKafka {
       result.append("时间：").append(new Timestamp(timestamp - 1)).append("\n")
 
       for( i <- sortedItems.indices ){
-        val currentItem: ItemViewCount = sortedItems(i)
+        val currentItem: ItemViewCountKafka = sortedItems(i)
         // 输出打印的格式 e.g.  No1：  商品ID=12224  浏览量=2413
         result.append("No").append(i+1).append(":")
           .append("  商品ID=").append(currentItem.itemId)
